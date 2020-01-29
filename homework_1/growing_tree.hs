@@ -2,14 +2,18 @@
 {-# OPTIONS_GHC -Wall #-}
 import CodeWorld
 
-tree :: Point -> Point -> Point -> Int -> Double -> Picture
-tree p1 p2 p3 n leavesMult = go p1 p2 p3 0
+tree :: Double -> Picture
+tree age = go (0, 0) (5, 0) (2.5, 7.5) 0.0
   where
-    go :: Point -> Point -> Point -> Int -> Picture
-    go (x1, y1) (x2, y2) (x3, y3) i
-      | i == n    = colored green (solidCircle (fromIntegral i * leavesMult))
+    go :: Point -> Point -> Point -> Double -> Picture
+    go p1@(x1, y1) p2@(x2, y2) p3@(x3, y3) i
+      | i >= age = colored green (solidCircle (0.5 * leavesScale))
+      | scale <= 1.0 = scaled scale scale (
+          translated x3 y3 leftBranch <>
+          solidPolygon [p1, p2, p3]
+        )
       | otherwise =
-          solidPolygon [(x1, y1), (x2, y2), (x3, y3)] <>
+          solidPolygon [p1, p2, p3] <>
           translated translateXLeft translateYLeft (leftBranch) <>
           translated translateXRight translateYRight (rightBranch)
       where
@@ -20,31 +24,37 @@ tree p1 p2 p3 n leavesMult = go p1 p2 p3 0
         nX3             = nX2 / 2.0
         nY3             = y3 / 2.0
         baseMidpoint    = (x3, y1)
-        oppositeCathet  = dist (x3, y3) baseMidpoint
-        adjacentCathet  = dist (x1, y1) baseMidpoint
-        hypothenus      = dist (x1, y1) (x3, y3)
-        adjacentAngle   = baseAngle oppositeCathet adjacentCathet
+        oppositeLeg     = dist (x3, y3) baseMidpoint
+        adjacentLeg     = dist (x1, y1) baseMidpoint
+        hypotenuse      = dist (x1, y1) (x3, y3)
+        adjacentAngle   = baseAngle oppositeLeg adjacentLeg
         newBase         = dist (nX1, nY1) (nX2, nY2)
-        transHypothenus = hypothenus - newBase
-        translateXLeft  = getAdjacentCathet transHypothenus adjacentAngle
-        translateYLeft  = getOppositeCathet transHypothenus adjacentAngle
+        transHypotenuse = hypotenuse - newBase
+        translateXLeft  = getAdjacentLeg transHypotenuse adjacentAngle
+        translateYLeft  = getOppositeLeg transHypotenuse adjacentAngle
         translateXRight = translateXLeft + (x3 - translateXLeft)
         translateYRight = translateYLeft + (y3 - translateYLeft)
-        segment         = go (nX1, nY1) (nX2, nY2) (nX3, nY3) (i + 1)
-        leftBranch      = rotated adjacentAngle segment
-        rightBranch     = rotated (-adjacentAngle) segment
+        nextSegment     = go (nX1, nY1) (nX2, nY2) (nX3, nY3) (i + 1)
+        leftBranch      = rotated adjacentAngle nextSegment
+        rightBranch     = rotated (-adjacentAngle) nextSegment
+        scale           = age - i
+        leavesScale     = (age - fromInteger (floor age))
 
-getAdjacentCathet :: Double -> Double -> Double
-getAdjacentCathet hypothenus adjacentAngle = hypothenus * (cos adjacentAngle)
+getAdjacentLeg :: Double -> Double -> Double
+getAdjacentLeg hypotenuse adjacentAngle = hypotenuse * (cos adjacentAngle)
 
-getOppositeCathet :: Double -> Double -> Double
-getOppositeCathet hypothenus adjacentAngle = hypothenus * (sin adjacentAngle)
+getOppositeLeg :: Double -> Double -> Double
+getOppositeLeg hypotenuse adjacentAngle = hypotenuse * (sin adjacentAngle)
 
 baseAngle :: Double -> Double -> Double
-baseAngle oppositeCathet adjacentCathet = atan (oppositeCathet / adjacentCathet)
+baseAngle oppositeLeg adjacentLeg = atan (oppositeLeg / adjacentLeg)
 
 dist :: Point -> Point -> Double
 dist (x1, y1) (x2, y2) = sqrt (((x1 - x2) ** 2.0) + ((y1 - y2) ** 2.0))
 
+growingTree :: Double -> Picture
+growingTree t = tree (treeDepth * (abs (sin (t / (treeDepth / 2)))))
+  where treeDepth = 6
+
 main :: IO ()
-main = drawingOf (tree (0, 0) (10, 0) (5, 30) 10 0.03)
+main = animationOf growingTree
